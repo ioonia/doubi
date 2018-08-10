@@ -5,12 +5,12 @@ export PATH
 #=================================================
 #	System Required: CentOS 6+/Debian 6+/Ubuntu 14.04+
 #	Description: Install the ShadowsocksR mudbjson server
-#	Version: 1.0.25
+#	Version: 1.0.26
 #	Author: Toyo
 #	Blog: https://doub.io/ss-jc60/
 #=================================================
 
-sh_ver="1.0.25"
+sh_ver="1.0.26"
 filepath=$(cd "$(dirname "$0")"; pwd)
 file=$(echo -e "${filepath}"|awk -F "$0" '{print $1}')
 ssr_folder="/usr/local/shadowsocksr"
@@ -405,6 +405,7 @@ Set_config_password(){
 }
 Set_config_method(){
 	echo -e "请选择要设置的用户 加密方式
+	
  ${Green_font_prefix} 1.${Font_color_suffix} none
  ${Tip} 如果使用 auth_chain_* 系列协议，建议加密方式选择 none (该系列协议自带 RC4 加密)，混淆随意
  
@@ -469,6 +470,7 @@ Set_config_method(){
 }
 Set_config_protocol(){
 	echo -e "请选择要设置的用户 协议插件
+	
  ${Green_font_prefix}1.${Font_color_suffix} origin
  ${Green_font_prefix}2.${Font_color_suffix} auth_sha1_v4
  ${Green_font_prefix}3.${Font_color_suffix} auth_aes128_md5
@@ -505,6 +507,7 @@ Set_config_protocol(){
 }
 Set_config_obfs(){
 	echo -e "请选择要设置的用户 混淆插件
+	
  ${Green_font_prefix}1.${Font_color_suffix} plain
  ${Green_font_prefix}2.${Font_color_suffix} http_simple
  ${Green_font_prefix}3.${Font_color_suffix} http_post
@@ -917,7 +920,7 @@ Installation_dependency(){
 	Check_python
 	#echo "nameserver 8.8.8.8" > /etc/resolv.conf
 	#echo "nameserver 8.8.4.4" >> /etc/resolv.conf
-	cp -f /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+	\cp -f /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 	if [[ ${release} == "centos" ]]; then
 		/etc/init.d/crond restart
 	else
@@ -974,6 +977,10 @@ Uninstall_SSR(){
 				port=$(echo "${user_info}"|sed -n "${integer}p"|awk '{print $4}')
 				Del_iptables
 			done
+		fi
+		if [[ ! -z $(crontab -l | grep "ssrmu.sh") ]]; then
+			crontab_monitor_ssr_cron_stop
+			Clear_transfer_all_cron_stop
 		fi
 		if [[ ${release} = "centos" ]]; then
 			chkconfig --del ssrmu
@@ -1037,12 +1044,12 @@ debian_View_user_connection_info(){
 	user_info=$(python mujson_mgr.py -l)
 	user_total=$(echo "${user_info}"|wc -l)
 	[[ -z ${user_info} ]] && echo -e "${Error} 没有发现 用户，请检查 !" && exit 1
-	IP_total=`netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp6' |awk '{print $5}' |awk -F ":" '{print $1}' |sort -u |wc -l`
+	IP_total=`netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp6' |awk '{print $5}' |awk -F ":" '{print $1}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}" |wc -l`
 	user_list_all=""
 	for((integer = 1; integer <= ${user_total}; integer++))
 	do
 		user_port=$(echo "${user_info}"|sed -n "${integer}p"|awk '{print $4}')
-		user_IP_1=`netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp6' |grep ":${user_port} " |awk '{print $5}' |awk -F ":" '{print $1}' |sort -u`
+		user_IP_1=`netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp6' |grep ":${user_port} " |awk '{print $5}' |awk -F ":" '{print $1}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}"`
 		if [[ -z ${user_IP_1} ]]; then
 			user_IP_total="0"
 		else
@@ -1065,12 +1072,12 @@ centos_View_user_connection_info(){
 	user_info=$(python mujson_mgr.py -l)
 	user_total=$(echo "${user_info}"|wc -l)
 	[[ -z ${user_info} ]] && echo -e "${Error} 没有发现 用户，请检查 !" && exit 1
-	IP_total=`netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp' | grep '::ffff:' |awk '{print $5}' |awk -F ":" '{print $4}' |sort -u |wc -l`
+	IP_total=`netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp' | grep '::ffff:' |awk '{print $5}' |awk -F ":" '{print $4}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}" |wc -l`
 	user_list_all=""
 	for((integer = 1; integer <= ${user_total}; integer++))
 	do
 		user_port=$(echo "${user_info}"|sed -n "${integer}p"|awk '{print $4}')
-		user_IP_1=`netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp' |grep ":${user_port} "|grep '::ffff:' |awk '{print $5}' |awk -F ":" '{print $4}' |sort -u`
+		user_IP_1=`netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp' |grep ":${user_port} "|grep '::ffff:' |awk '{print $5}' |awk -F ":" '{print $4}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}"`
 		if [[ -z ${user_IP_1} ]]; then
 			user_IP_total="0"
 		else
@@ -1761,7 +1768,7 @@ crontab_monitor_ssr_cron_stop(){
 }
 Update_Shell(){
 	echo -e "当前版本为 [ ${sh_ver} ]，开始检测最新版本..."
-	sh_new_ver=$(wget --no-check-certificate -qO- "https://softs.fun/Bash/ssrmu.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="softs"
+	sh_new_ver=$(wget --no-check-certificate -qO- "https://softs.loan/Bash/ssrmu.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="softs"
 	[[ -z ${sh_new_ver} ]] && sh_new_ver=$(wget --no-check-certificate -qO- "https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/ssrmu.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="github"
 	[[ -z ${sh_new_ver} ]] && echo -e "${Error} 检测最新版本失败 !" && exit 0
 	if [[ ${sh_new_ver} != ${sh_ver} ]]; then
@@ -1769,9 +1776,13 @@ Update_Shell(){
 		stty erase '^H' && read -p "(默认: y):" yn
 		[[ -z "${yn}" ]] && yn="y"
 		if [[ ${yn} == [Yy] ]]; then
+			if [[ -e "/etc/init.d/ssrmu" ]]; then
+				rm -rf /etc/init.d/ssrmu
+				Service_SSR
+			fi
 			cd "${file}"
 			if [[ $sh_new_type == "softs" ]]; then
-				wget -N --no-check-certificate https://softs.fun/Bash/ssrmu.sh && chmod +x ssrmu.sh
+				wget -N --no-check-certificate https://softs.loan/Bash/ssrmu.sh && chmod +x ssrmu.sh
 			else
 				wget -N --no-check-certificate https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/ssrmu.sh && chmod +x ssrmu.sh
 			fi
@@ -1818,7 +1829,7 @@ else
   ${Green_font_prefix}6.${Font_color_suffix} 显示 连接信息
   ${Green_font_prefix}7.${Font_color_suffix} 设置 用户配置
   ${Green_font_prefix}8.${Font_color_suffix} 手动 修改配置
-  ${Green_font_prefix}9.${Font_color_suffix} 清零 已用流量
+  ${Green_font_prefix}9.${Font_color_suffix} 配置 流量清零
 ————————————
  ${Green_font_prefix}10.${Font_color_suffix} 启动 ShadowsocksR
  ${Green_font_prefix}11.${Font_color_suffix} 停止 ShadowsocksR

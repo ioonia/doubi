@@ -5,12 +5,12 @@ export PATH
 #=================================================
 #	System Required: CentOS/Debian/Ubuntu
 #	Description: ServerStatus client + server
-#	Version: 1.0.10
+#	Version: 1.0.11
 #	Author: Toyo
 #	Blog: https://doub.io/shell-jc3/
 #=================================================
 
-sh_ver="1.0.10"
+sh_ver="1.0.11"
 file="/usr/local/ServerStatus"
 web_file="/usr/local/ServerStatus/web"
 server_file="/usr/local/ServerStatus/server"
@@ -766,7 +766,7 @@ Set_iptables(){
 }
 Update_Shell(){
 	echo -e "当前版本为 [ ${sh_ver} ]，开始检测最新版本..."
-	sh_new_ver=$(wget --no-check-certificate -qO- "https://softs.fun/Bash/status.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="softs"
+	sh_new_ver=$(wget --no-check-certificate -qO- "https://softs.loan/Bash/status.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="softs"
 	[[ -z ${sh_new_ver} ]] && sh_new_ver=$(wget --no-check-certificate -qO- "https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/status.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="github"
 	[[ -z ${sh_new_ver} ]] && echo -e "${Error} 检测最新版本失败 !" && exit 0
 	if [[ ${sh_new_ver} != ${sh_ver} ]]; then
@@ -774,8 +774,16 @@ Update_Shell(){
 		stty erase '^H' && read -p "(默认: y):" yn
 		[[ -z "${yn}" ]] && yn="y"
 		if [[ ${yn} == [Yy] ]]; then
+			if [[ -e "/etc/init.d/status-client" ]]; then
+				rm -rf /etc/init.d/status-client
+				Service_Server_Status_client
+			fi
+			if [[ -e "/etc/init.d/status-server" ]]; then
+				rm -rf /etc/init.d/status-server
+				Service_Server_Status_server
+			fi
 			if [[ $sh_new_type == "softs" ]]; then
-				wget -N --no-check-certificate https://softs.fun/Bash/status.sh && chmod +x status.sh
+				wget -N --no-check-certificate https://softs.loan/Bash/status.sh && chmod +x status.sh
 			else
 				wget -N --no-check-certificate https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/status.sh && chmod +x status.sh
 			fi

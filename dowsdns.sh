@@ -5,12 +5,12 @@ export PATH
 #=================================================
 #	System Required: CentOS/Debian/Ubuntu
 #	Description: DowsDNS
-#	Version: 1.0.7
+#	Version: 1.0.8
 #	Author: Toyo
 #	Blog: https://doub.io/dowsdns-jc3/
 #=================================================
 
-sh_ver="1.0.7"
+sh_ver="1.0.8"
 file="/usr/local/dowsDNS"
 dowsdns_conf="/usr/local/dowsDNS/conf/config.json"
 dowsdns_data="/usr/local/dowsDNS/conf/hosts_repository_config.json"
@@ -20,6 +20,10 @@ dowsdns_log="/tmp/dowsdns.log"
 Green_font_prefix="\033[32m" && Red_font_prefix="\033[31m" && Green_background_prefix="\033[42;37m" && Red_background_prefix="\033[41;37m" && Font_color_suffix="\033[0m"
 Info="${Green_font_prefix}[信息]${Font_color_suffix}" && Error="${Red_font_prefix}[错误]${Font_color_suffix}" && Tip="${Green_font_prefix}[注意]${Font_color_suffix}"
 
+
+check_root(){
+	[[ $EUID != 0 ]] && echo -e "${Error} 当前非ROOT账号(或没有ROOT权限)，无法继续操作，请更换ROOT账号或使用 ${Green_background_prefix}sudo su${Font_color_suffix} 命令获取临时ROOT权限（执行后可能会提示输入当前账号的密码）。" && exit 1
+}
 #检查系统
 check_sys(){
 	if [[ -f /etc/redhat-release ]]; then
@@ -47,7 +51,7 @@ check_pid(){
 }
 Download_dowsdns(){
 	cd "/usr/local"
-	wget -N --no-check-certificate "https://softs.fun/%E7%A7%91%E5%AD%A6%E4%B8%8A%E7%BD%91/PC/dowsDNS/Linux%2BMac/dowsDNS.zip"
+	wget -N --no-check-certificate "https://softs.loan/%E7%A7%91%E5%AD%A6%E4%B8%8A%E7%BD%91/PC/dowsDNS/Linux%2BMac/dowsDNS.zip"
 	[[ ! -e "dowsDNS.zip" ]] && echo -e "${Error} DowsDNS 下载失败 !" && exit 1
 	unzip dowsDNS.zip && rm -rf dowsDNS.zip
 	[[ ! -e "dowsDNS-master" ]] && echo -e "${Error} DowsDNS 解压失败 !" && exit 1
@@ -56,14 +60,14 @@ Download_dowsdns(){
 }
 Service_dowsdns(){
 	if [[ ${release} = "centos" ]]; then
-		if ! wget --no-check-certificate "https://softs.fun/Bash/other/dowsdns_centos" -O /etc/init.d/dowsdns; then
+		if ! wget --no-check-certificate "https://softs.loan/Bash/other/dowsdns_centos" -O /etc/init.d/dowsdns; then
 			echo -e "${Error} DowsDNS 服务管理脚本下载失败 !" && exit 1
 		fi
 		chmod +x /etc/init.d/dowsdns
 		chkconfig --add dowsdns
 		chkconfig dowsdns on
 	else
-		if ! wget --no-check-certificate "https://softs.fun/Bash/other/dowsdns_debian" -O /etc/init.d/dowsdns; then
+		if ! wget --no-check-certificate "https://softs.loan/Bash/other/dowsdns_debian" -O /etc/init.d/dowsdns; then
 			echo -e "${Error} DowsDNS 服务管理脚本下载失败 !" && exit 1
 		fi
 		chmod +x /etc/init.d/dowsdns
@@ -423,6 +427,7 @@ Modify_wrcd(){
 	Restart_dowsdns
 }
 Install_dowsdns(){
+	check_root
 	[[ -e ${file} ]] && echo -e "${Error} 检测到 DowsDNS 已安装 !" && exit 1
 	check_sys
 	echo -e "${Info} 开始设置 用户配置..."
@@ -538,14 +543,23 @@ View_Log(){
 }
 Update_Shell(){
 	echo -e "当前版本为 [ ${sh_ver} ]，开始检测最新版本..."
-	sh_new_ver=$(wget --no-check-certificate -qO- softs.fun/Bash/dowsdns.sh|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1)
+	sh_new_ver=$(wget --no-check-certificate -qO- "https://softs.loan/Bash/dowsdns.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="softs"
+	[[ -z ${sh_new_ver} ]] && sh_new_ver=$(wget --no-check-certificate -qO- "https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/dowsdns.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="github"
 	[[ -z ${sh_new_ver} ]] && echo -e "${Error} 检测最新版本失败 !" && exit 0
 	if [[ ${sh_new_ver} != ${sh_ver} ]]; then
 		echo -e "发现新版本[ ${sh_new_ver} ]，是否更新？[Y/n]"
 		stty erase '^H' && read -p "(默认: y):" yn
 		[[ -z "${yn}" ]] && yn="y"
 		if [[ ${yn} == [Yy] ]]; then
-			wget -N --no-check-certificate "https://softs.fun/Bash/dowsdns.sh" && chmod +x dowsdns.sh
+			if [[ -e "/etc/init.d/dowsdns" ]]; then
+				rm -rf /etc/init.d/dowsdns
+				Service_dowsdns
+			fi
+			if [[ ${sh_new_type} == "softs" ]]; then
+				wget -N --no-check-certificate https://softs.loan/Bash/dowsdns.sh && chmod +x dowsdns.sh
+			else
+				wget -N --no-check-certificate https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/dowsdns.sh && chmod +x dowsdns.sh
+			fi
 			echo -e "脚本已更新为最新版本[ ${sh_new_ver} ] !"
 		else
 			echo && echo "	已取消..." && echo

@@ -5,11 +5,11 @@ export PATH
 #=================================================
 #	System Required: Debian/Ubuntu
 #	Description: ocserv AnyConnect
-#	Version: 1.0.3
+#	Version: 1.0.4
 #	Author: Toyo
 #	Blog: https://doub.io/vpnzy-7/
 #=================================================
-sh_ver="1.0.3"
+sh_ver="1.0.4"
 file="/usr/local/sbin/ocserv"
 conf_file="/etc/ocserv"
 conf="/etc/ocserv/ocserv.conf"
@@ -23,6 +23,9 @@ Info="${Green_font_prefix}[信息]${Font_color_suffix}"
 Error="${Red_font_prefix}[错误]${Font_color_suffix}"
 Tip="${Green_font_prefix}[注意]${Font_color_suffix}"
 
+check_root(){
+	[[ $EUID != 0 ]] && echo -e "${Error} 当前非ROOT账号(或没有ROOT权限)，无法继续操作，请更换ROOT账号或使用 ${Green_background_prefix}sudo su${Font_color_suffix} 命令获取临时ROOT权限（执行后可能会提示输入当前账号的密码）。" && exit 1
+}
 #检查系统
 check_sys(){
 	if [[ -f /etc/redhat-release ]]; then
@@ -55,11 +58,20 @@ check_pid(){
 }
 Get_ip(){
 	ip=$(wget -qO- -t1 -T2 ipinfo.io/ip)
+	if [[ -z "${ip}" ]]; then
+		ip=$(wget -qO- -t1 -T2 api.ip.sb/ip)
+		if [[ -z "${ip}" ]]; then
+			ip=$(wget -qO- -t1 -T2 members.3322.org/dyndns/getip)
+			if [[ -z "${ip}" ]]; then
+				ip="VPS_IP"
+			fi
+		fi
+	fi
 }
 Download_ocserv(){
 	mkdir "ocserv" && cd "ocserv"
 	wget "ftp://ftp.infradead.org/pub/ocserv/ocserv-${ocserv_ver}.tar.xz"
-	[[ ! -s "ocserv-${ocserv_ver}.tar.xz" ]] && echo -e "${Error} ocserv 源码文件下载失败 !" && rm -rf "ocserv-${ocserv_ver}.tar.xz" && exit 1
+	[[ ! -s "ocserv-${ocserv_ver}.tar.xz" ]] && echo -e "${Error} ocserv 源码文件下载失败 !" && rm -rf "ocserv/" && rm -rf "ocserv-${ocserv_ver}.tar.xz" && exit 1
 	tar -xJf ocserv-0.11.8.tar.xz && cd ocserv-0.11.8
 	./configure
 	make
@@ -67,9 +79,13 @@ Download_ocserv(){
 	cd .. && cd ..
 	rm -rf ocserv/
 	
-	mkdir "${conf_file}"
-	wget --no-check-certificate -N -P "${conf_file}" "https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/other/ocserv.conf"
-	[[ ! -s "${conf}" ]] && echo -e "${Error} ocserv 配置文件下载失败 !" && rm -rf "${conf_file}" && exit 1
+	if [[ -e ${file} ]]; then
+		mkdir "${conf_file}"
+		wget --no-check-certificate -N -P "${conf_file}" "https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/other/ocserv.conf"
+		[[ ! -s "${conf}" ]] && echo -e "${Error} ocserv 配置文件下载失败 !" && rm -rf "${conf_file}" && exit 1
+	else
+		echo -e "${Error} ocserv 编译安装失败，请检查！" && exit 1
+	fi
 }
 Service_ocserv(){
 	if ! wget --no-check-certificate https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/other/ocserv_debian -O /etc/init.d/ocserv; then
@@ -135,18 +151,18 @@ Installation_dependency(){
 		mv /etc/apt/sources.list /etc/apt/sources.list.bak
 		wget --no-check-certificate -O "/etc/apt/sources.list" "https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/sources/us.sources.list"
 		apt-get update
-		apt-get install vim pkg-config build-essential libgnutls28-dev libwrap0-dev liblz4-dev libseccomp-dev libreadline-dev libnl-nf-3-dev libev-dev gnutls-bin -y
+		apt-get install vim net-tools pkg-config build-essential libgnutls28-dev libwrap0-dev liblz4-dev libseccomp-dev libreadline-dev libnl-nf-3-dev libev-dev gnutls-bin -y
 		rm -rf /etc/apt/sources.list
 		mv /etc/apt/sources.list.bak /etc/apt/sources.list
 		apt-get update
 	else
 		apt-get update
-		apt-get install vim pkg-config build-essential libgnutls28-dev libwrap0-dev liblz4-dev libseccomp-dev libreadline-dev libnl-nf-3-dev libev-dev gnutls-bin -y
+		apt-get install vim net-tools pkg-config build-essential libgnutls28-dev libwrap0-dev liblz4-dev libseccomp-dev libreadline-dev libnl-nf-3-dev libev-dev gnutls-bin -y
 	fi
 }
 Install_ocserv(){
+	check_root
 	[[ -e ${file} ]] && echo -e "${Error} ocserv 已安装，请检查 !" && exit 1
-	check_sys
 	echo -e "${Info} 开始安装/配置 依赖..."
 	Installation_dependency
 	echo -e "${Info} 开始下载/安装 配置文件..."
@@ -454,7 +470,7 @@ Set_iptables(){
 	ifconfig_status=$(ifconfig)
 	if [[ -z ${ifconfig_status} ]]; then
 		echo -e "${Error} ifconfig 未安装 !"
-		stty erase '^H' && read -p "请手动输入你的网卡名(一般为 eth0，OpenVZ则为 venet0):" Network_card
+		stty erase '^H' && read -p "请手动输入你的网卡名(一般为 eth0，OpenVZ 虚拟化则为 venet0):" Network_card
 		[[ -z "${Network_card}" ]] && echo "取消..." && exit 1
 	else
 		Network_card=$(ifconfig|grep "eth0")
@@ -466,7 +482,7 @@ Set_iptables(){
 				Network_card="venet0"
 			else
 				ifconfig
-				stty erase '^H' && read -p "检测到本VPS的网卡非 eth0和venet0 请手动输入你的网卡名:" Network_card
+				stty erase '^H' && read -p "检测到本服务器的网卡非 eth0 和 venet0 请根据上面输出的网卡信息手动输入你的网卡名:" Network_card
 				[[ -z "${Network_card}" ]] && echo "取消..." && exit 1
 			fi
 		fi
@@ -479,14 +495,23 @@ Set_iptables(){
 }
 Update_Shell(){
 	echo -e "当前版本为 [ ${sh_ver} ]，开始检测最新版本..."
-	sh_new_ver=$(wget --no-check-certificate -qO- "https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/ocserv.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1)
-	[[ -z ${sh_new_ver} ]] && echo -e "${Error} 检测最新版本失败 !" && exit 1
+	sh_new_ver=$(wget --no-check-certificate -qO- "https://softs.loan/Bash/ocserv.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="softs"
+	[[ -z ${sh_new_ver} ]] && sh_new_ver=$(wget --no-check-certificate -qO- "https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/ocserv.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="github"
+	[[ -z ${sh_new_ver} ]] && echo -e "${Error} 检测最新版本失败 !" && exit 0
 	if [[ ${sh_new_ver} != ${sh_ver} ]]; then
 		echo -e "发现新版本[ ${sh_new_ver} ]，是否更新？[Y/n]"
 		stty erase '^H' && read -p "(默认: y):" yn
 		[[ -z "${yn}" ]] && yn="y"
 		if [[ ${yn} == [Yy] ]]; then
-			wget -N --no-check-certificate https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/ocserv.sh && chmod +x ocserv.sh
+			if [[ -e "/etc/init.d/ocserv" ]]; then
+				rm -rf /etc/init.d/ocserv
+				Service_ocserv
+			fi
+			if [[ $sh_new_type == "softs" ]]; then
+				wget -N --no-check-certificate https://softs.loan/Bash/ocserv.sh && chmod +x ocserv.sh
+			else
+				wget -N --no-check-certificate https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/ocserv.sh && chmod +x ocserv.sh
+			fi
 			echo -e "脚本已更新为最新版本[ ${sh_new_ver} ] !"
 		else
 			echo && echo "	已取消..." && echo

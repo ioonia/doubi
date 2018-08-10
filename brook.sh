@@ -5,12 +5,12 @@ export PATH
 #=================================================
 #	System Required: CentOS/Debian/Ubuntu
 #	Description: Brook
-#	Version: 1.1.10
+#	Version: 1.1.11
 #	Author: Toyo
 #	Blog: https://doub.io/brook-jc3/
 #=================================================
 
-sh_ver="1.1.10"
+sh_ver="1.1.11"
 filepath=$(cd "$(dirname "$0")"; pwd)
 file_1=$(echo -e "${filepath}"|awk -F "$0" '{print $1}')
 file="/usr/local/brook"
@@ -24,6 +24,9 @@ Info="${Green_font_prefix}[信息]${Font_color_suffix}"
 Error="${Red_font_prefix}[错误]${Font_color_suffix}"
 Tip="${Green_font_prefix}[注意]${Font_color_suffix}"
 
+check_root(){
+	[[ $EUID != 0 ]] && echo -e "${Error} 当前非ROOT账号(或没有ROOT权限)，无法继续操作，请更换ROOT账号或使用 ${Green_background_prefix}sudo su${Font_color_suffix} 命令获取临时ROOT权限（执行后可能会提示输入当前账号的密码）。" && exit 1
+}
 #检查系统
 check_sys(){
 	if [[ -f /etc/redhat-release ]]; then
@@ -48,7 +51,7 @@ check_installed_status(){
 }
 check_crontab_installed_status(){
 	if [[ ! -e ${Crontab_file} ]]; then
-		echo -e "${Error} Crontab 没有安装，开始安装..." && exit 1
+		echo -e "${Error} Crontab 没有安装，开始安装..."
 		if [[ ${release} == "centos" ]]; then
 			yum install crond -y
 		else
@@ -68,7 +71,7 @@ check_new_ver(){
 	brook_new_ver=`wget -qO- https://github.com/txthinking/brook/tags| grep "/txthinking/brook/releases/tag/"| head -n 1| awk -F "/tag/" '{print $2}'| sed 's/\">//'`
 	if [[ -z ${brook_new_ver} ]]; then
 		echo -e "${Error} Brook 最新版本获取失败，请手动获取最新版本号[ https://github.com/txthinking/brook/releases ]"
-		stty erase '^H' && read -p "请输入版本号 [ 格式是日期 , 如 v20170330 ] :" brook_new_ver
+		stty erase '^H' && read -p "请输入版本号 [ 格式是日期 , 如 v20180401 ] :" brook_new_ver
 		[[ -z "${brook_new_ver}" ]] && echo "取消..." && exit 1
 	else
 		echo -e "${Info} 检测到 Brook 最新版本为 [ ${brook_new_ver} ]"
@@ -106,14 +109,14 @@ Download_brook(){
 }
 Service_brook(){
 	if [[ ${release} = "centos" ]]; then
-		if ! wget --no-check-certificate "https://softs.fun/Bash/other/brook_centos" -O /etc/init.d/brook; then
+		if ! wget --no-check-certificate "https://softs.loan/Bash/other/brook_centos" -O /etc/init.d/brook; then
 			echo -e "${Error} Brook服务 管理脚本下载失败 !" && exit 1
 		fi
 		chmod +x "/etc/init.d/brook"
 		chkconfig --add brook
 		chkconfig brook on
 	else
-		if ! wget --no-check-certificate "https://softs.fun/Bash/other/brook_debian" -O /etc/init.d/brook; then
+		if ! wget --no-check-certificate "https://softs.loan/Bash/other/brook_debian" -O /etc/init.d/brook; then
 			echo -e "${Error} Brook服务 管理脚本下载失败 !" && exit 1
 		fi
 		chmod +x "/etc/init.d/brook"
@@ -127,7 +130,7 @@ Installation_dependency(){
 	else
 		Debian_apt
 	fi
-	cp -f /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+	\cp -f /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 	mkdir ${file}
 }
 Centos_yum(){
@@ -202,7 +205,7 @@ Set_port(){
 		done
 }
 Set_passwd(){
-	echo "请输入 Brook 密码"
+	echo "请输入 Brook 密码（因分享链接特性，密码请勿包含 % 符号）"
 	stty erase '^H' && read -p "(默认: doub.io):" bk_passwd
 	[[ -z "${bk_passwd}" ]] && bk_passwd="doub.io"
 	echo && echo "========================"
@@ -330,6 +333,7 @@ Modify_protocol(){
 	Restart_brook
 }
 Install_brook(){
+	check_root
 	[[ -e ${brook_file} ]] && echo -e "${Error} 检测到 Brook 已安装 !" && exit 1
 	echo -e "${Info} 开始设置 用户配置..."
 	Set_port
@@ -404,6 +408,9 @@ Uninstall_brook(){
 				done
 			fi
 		fi
+		if [[ ! -z $(crontab -l | grep "brook.sh monitor") ]]; then
+			crontab_monitor_brook_cron_stop
+		fi
 		rm -rf "${file}"
 		if [[ ${release} = "centos" ]]; then
 			chkconfig --del brook
@@ -474,13 +481,13 @@ View_Log(){
 debian_View_user_connection_info(){
 	format_1=$1
 	Read_config
-	IP_total=`netstat -anp |grep 'ESTABLISHED' |grep 'brook' |grep 'tcp6' |awk '{print $5}' |awk -F ":" '{print $1}' |sort -u |wc -l`
+	IP_total=`netstat -anp |grep 'ESTABLISHED' |grep 'brook' |grep 'tcp6' |awk '{print $5}' |awk -F ":" '{print $1}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}" |wc -l`
 	echo -e "用户总数: ${Green_background_prefix} "${user_all_num}" ${Font_color_suffix} 链接IP总数: ${Green_background_prefix} "${IP_total}" ${Font_color_suffix} "
 	
 	for((integer = 1; integer <= ${user_all_num}; integer++))
 	do
 		user_port=$(echo "${user_all}"|sed -n "${integer}p"|awk '{print $1}')
-		user_IP_1=`netstat -anp |grep 'ESTABLISHED' |grep 'brook' |grep 'tcp6' |grep ":${user_port} " |awk '{print $5}' |awk -F ":" '{print $1}' |sort -u`
+		user_IP_1=`netstat -anp |grep 'ESTABLISHED' |grep 'brook' |grep 'tcp6' |grep ":${user_port} " |awk '{print $5}' |awk -F ":" '{print $1}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}"`
 		if [[ -z ${user_IP_1} ]]; then
 			user_IP_total="0"
 			echo -e "端口: ${Green_font_prefix}"${user_port}"${Font_color_suffix}\t 链接IP总数: ${Green_font_prefix}"${user_IP_total}"${Font_color_suffix}\t 当前链接IP: "
@@ -501,13 +508,13 @@ debian_View_user_connection_info(){
 centos_View_user_connection_info(){
 	format_1=$1
 	Read_config
-	IP_total=`netstat -anp |grep 'ESTABLISHED' |grep 'brook' |grep 'tcp' | grep '::ffff:' |awk '{print $5}' |awk -F ":" '{print $4}' |sort -u |wc -l`
+	IP_total=`netstat -anp |grep 'ESTABLISHED' |grep 'brook' |grep 'tcp' | grep '::ffff:' |awk '{print $5}' |awk -F ":" '{print $4}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}" |wc -l`
 	echo -e "用户总数: ${Green_background_prefix} "${user_all_num}" ${Font_color_suffix} 链接IP总数: ${Green_background_prefix} "${IP_total}" ${Font_color_suffix} "
 	
 	for((integer = 1; integer <= ${user_all_num}; integer++))
 	do
 		user_port=$(echo "${user_all}"|sed -n "${integer}p"|awk '{print $1}')
-		user_IP_1=`netstat -anp |grep 'ESTABLISHED' |grep 'brook' |grep 'tcp' |grep ":${user_port} "|grep '::ffff:' |awk '{print $5}' |awk -F ":" '{print $4}' |sort -u`
+		user_IP_1=`netstat -anp |grep 'ESTABLISHED' |grep 'brook' |grep 'tcp' |grep ":${user_port} "|grep '::ffff:' |awk '{print $5}' |awk -F ":" '{print $4}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}"`
 		if [[ -z ${user_IP_1} ]]; then
 			user_IP_total="0"
 			echo -e "端口: ${Green_font_prefix}"${user_port}"${Font_color_suffix}\t 链接IP总数: ${Green_font_prefix}"${user_IP_total}"${Font_color_suffix}\t 当前链接IP: "
@@ -576,7 +583,7 @@ Set_crontab_monitor_brook(){
 	crontab_monitor_brook_status=$(crontab -l|grep "brook.sh monitor")
 	if [[ -z "${crontab_monitor_brook_status}" ]]; then
 		echo && echo -e "当前监控模式: ${Green_font_prefix}未开启${Font_color_suffix}" && echo
-		echo -e "确定要开启 ${Green_font_prefix}Brook 服务端运行状态监控${Font_color_suffix} 功能吗？(当进程关闭则自动启动SSR服务端)[Y/n]"
+		echo -e "确定要开启 ${Green_font_prefix}Brook 服务端运行状态监控${Font_color_suffix} 功能吗？(当进程关闭则自动启动 Brook 服务端)[Y/n]"
 		stty erase '^H' && read -p "(默认: y):" crontab_monitor_brook_status_ny
 		[[ -z "${crontab_monitor_brook_status_ny}" ]] && crontab_monitor_brook_status_ny="y"
 		if [[ ${crontab_monitor_brook_status_ny} == [Yy] ]]; then
@@ -586,7 +593,7 @@ Set_crontab_monitor_brook(){
 		fi
 	else
 		echo && echo -e "当前监控模式: ${Green_font_prefix}已开启${Font_color_suffix}" && echo
-		echo -e "确定要关闭 ${Green_font_prefix}Brook 服务端运行状态监控${Font_color_suffix} 功能吗？(当进程关闭则自动启动SSR服务端)[y/N]"
+		echo -e "确定要关闭 ${Green_font_prefix}Brook 服务端运行状态监控${Font_color_suffix} 功能吗？(当进程关闭则自动启动 Brook 服务端)[y/N]"
 		stty erase '^H' && read -p "(默认: n):" crontab_monitor_brook_status_ny
 		[[ -z "${crontab_monitor_brook_status_ny}" ]] && crontab_monitor_brook_status_ny="n"
 		if [[ ${crontab_monitor_brook_status_ny} == [Yy] ]]; then
@@ -624,7 +631,7 @@ crontab_monitor_brook_cron_stop(){
 crontab_monitor_brook(){
 	check_installed_status
 	check_pid
-	echo "${PID}"
+	#echo "${PID}"
 	if [[ -z ${PID} ]]; then
 		echo -e "${Error} [$(date "+%Y-%m-%d %H:%M:%S %u %Z")] 检测到 Brook服务端 未运行 , 开始启动..." | tee -a ${brook_log}
 		/etc/init.d/brook start
@@ -666,7 +673,7 @@ Set_iptables(){
 }
 Update_Shell(){
 	echo -e "当前版本为 [ ${sh_ver} ]，开始检测最新版本..."
-	sh_new_ver=$(wget --no-check-certificate -qO- "https://softs.fun/Bash/brook.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="softs"
+	sh_new_ver=$(wget --no-check-certificate -qO- "https://softs.loan/Bash/brook.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="softs"
 	[[ -z ${sh_new_ver} ]] && sh_new_ver=$(wget --no-check-certificate -qO- "https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/brook.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="github"
 	[[ -z ${sh_new_ver} ]] && echo -e "${Error} 检测最新版本失败 !" && exit 0
 	if [[ ${sh_new_ver} != ${sh_ver} ]]; then
@@ -674,8 +681,12 @@ Update_Shell(){
 		stty erase '^H' && read -p "(默认: y):" yn
 		[[ -z "${yn}" ]] && yn="y"
 		if [[ ${yn} == [Yy] ]]; then
+			if [[ -e "/etc/init.d/brook" ]]; then
+				rm -rf /etc/init.d/brook
+				Service_brook
+			fi
 			if [[ ${sh_new_type} == "softs" ]]; then
-				wget -N --no-check-certificate https://softs.fun/Bash/brook.sh && chmod +x brook.sh
+				wget -N --no-check-certificate https://softs.loan/Bash/brook.sh && chmod +x brook.sh
 			else
 				wget -N --no-check-certificate https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/brook.sh && chmod +x brook.sh
 			fi
@@ -698,7 +709,7 @@ else
  ${Green_font_prefix} 0.${Font_color_suffix} 升级脚本
 ————————————
  ${Green_font_prefix} 1.${Font_color_suffix} 安装 Brook
- ${Green_font_prefix} 2.${Font_color_suffix} 升级 Brook
+ ${Green_font_prefix} 2.${Font_color_suffix} 更新 Brook
  ${Green_font_prefix} 3.${Font_color_suffix} 卸载 Brook
 ————————————
  ${Green_font_prefix} 4.${Font_color_suffix} 启动 Brook

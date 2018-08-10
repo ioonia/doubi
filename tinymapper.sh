@@ -5,13 +5,11 @@ export PATH
 #=================================================
 #	System Required: CentOS/Debian/Ubuntu
 #	Description: tinyPortMapper
-#	Version: 1.0.0
+#	Version: 1.0.2
 #	Author: Toyo
 #	Blog: https://doub.io/wlzy-36/
 #=================================================
-sh_ver="1.0.0"
-filepath=$(cd "$(dirname "$0")"; pwd)
-file=$(echo -e "${filepath}"|awk -F "$0" '{print $1}')
+sh_ver="1.0.2"
 
 Folder="/usr/local/tinyPortMapper"
 File="/usr/local/tinyPortMapper/tinymapper"
@@ -88,10 +86,10 @@ check_sys(){
 	bit=`uname -m`
 }
 check_new_ver(){
-	tinymapper_new_ver=$(wget -qO- "https://github.com/wangyu-/tinyPortMapper/tags"| grep "/wangyu-/tinyPortMapper/releases/tag/"| head -n 1| awk -F "/tag/" '{print $2}'| sed 's/\">//')
+	tinymapper_new_ver=$(wget --no-check-certificate -qO- https://api.github.com/repos/wangyu-/tinyPortMapper/releases | grep -o '"tag_name": ".*"' |grep -v '20180620.0'|head -n 1| sed 's/"//g;s/v//g' | sed 's/tag_name: //g')
 	if [[ -z ${tinymapper_new_ver} ]]; then
 		echo -e "${Error} tinyPortMapper 最新版本获取失败，请手动获取最新版本号[ https://github.com/wangyu-/tinyPortMapper/releases ]"
-		stty erase '^H' && read -p "请输入版本号 [ 格式是日期 , 如 20171112.0 ] :" tinymapper_new_ver
+		stty erase '^H' && read -p "请输入版本号 [ 格式是日期 , 如 20180224.0 ] :" tinymapper_new_ver
 		[[ -z "${tinymapper_new_ver}" ]] && echo "取消..." && exit 1
 	else
 		echo -e "${Info} 检测到 tinyPortMapper 最新版本为 [ ${tinymapper_new_ver} ]"
@@ -374,7 +372,7 @@ View_Log(){
 }
 Update_Shell(){
 	echo -e "当前版本为 [ ${sh_ver} ]，开始检测最新版本..."
-	sh_new_ver=$(wget --no-check-certificate -qO- "https://softs.fun/Bash/tinymapper.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="softs"
+	sh_new_ver=$(wget --no-check-certificate -qO- "https://softs.loan/Bash/tinymapper.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="softs"
 	[[ -z ${sh_new_ver} ]] && sh_new_ver=$(wget --no-check-certificate -qO- "https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/tinymapper.sh"|grep 'sh_ver="'|awk -F "=" '{print $NF}'|sed 's/\"//g'|head -1) && sh_new_type="github"
 	[[ -z ${sh_new_ver} ]] && echo -e "${Error} 检测最新版本失败 !" && exit 0
 	if [[ ${sh_new_ver} != ${sh_ver} ]]; then
@@ -382,9 +380,8 @@ Update_Shell(){
 		stty erase '^H' && read -p "(默认: y):" yn
 		[[ -z "${yn}" ]] && yn="y"
 		if [[ ${yn} == [Yy] ]]; then
-			cd "${file}"
 			if [[ $sh_new_type == "softs" ]]; then
-				wget -N --no-check-certificate https://softs.fun/Bash/tinymapper.sh && chmod +x tinymapper.sh
+				wget -N --no-check-certificate https://softs.loan/Bash/tinymapper.sh && chmod +x tinymapper.sh
 			else
 				wget -N --no-check-certificate https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/tinymapper.sh && chmod +x tinymapper.sh
 			fi
